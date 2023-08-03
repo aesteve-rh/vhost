@@ -186,6 +186,13 @@ where
         // Do not expect poisoned lock.
         self.handler.lock().unwrap().get_epoll_handlers()
     }
+
+    /// Retrieve the vrings vector.
+    /// 
+    /// Necessary for backends that need to start asynchronous communication to the frontend.
+    pub fn get_vrings(&self) -> Vec<V> {
+        self.handler.lock().unwrap().get_vrings()
+    }
 }
 
 #[cfg(test)]

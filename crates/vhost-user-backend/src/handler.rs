@@ -149,6 +149,10 @@ where
             worker_threads,
         })
     }
+
+    pub(crate) fn get_vrings(&self) -> Vec<V> {
+        self.vrings.clone()
+    }
 }
 
 impl<S, V, B: Bitmap> VhostUserHandler<S, V, B> {
