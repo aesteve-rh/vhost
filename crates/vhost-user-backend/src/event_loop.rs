@@ -74,6 +74,10 @@ impl<S, V, B> VringEpollHandler<S, V, B> {
             let _ = eventfd.write(1);
         }
     }
+
+    pub fn send_vring_event(&self, eventfd: &EventFd) {
+        let _ = eventfd.write(1);
+    }
 }
 
 impl<S, V, B> VringEpollHandler<S, V, B>
@@ -205,10 +209,12 @@ where
 
             // If the vring is not enabled, it should not be processed.
             if !enabled {
+                println!("vring not enabled for queue {}", device_event);
                 return Ok(false);
             }
         }
 
+        println!("backend processing event on queue {}", device_event);
         self.backend
             .handle_event(device_event, evset, &self.vrings, self.thread_id)
             .map_err(VringEpollError::HandleEventBackendHandling)

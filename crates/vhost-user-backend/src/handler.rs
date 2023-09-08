@@ -486,6 +486,14 @@ where
         // or after it has been disabled by VHOST_USER_SET_VRING_ENABLE
         // with parameter 0.
         self.vrings[index as usize].set_enabled(enable);
+        if enable {
+            if let Some(fd) = self.vrings[index as usize].get_ref().get_kick() {
+                for thread_index in 0..self.queues_per_thread.len() {
+                    println!("send event on vring {}", index);
+                    self.handlers[thread_index].send_vring_event(fd);
+                }
+            }
+        }
 
         Ok(())
     }
