@@ -188,6 +188,8 @@ enum_value! {
         /// After transferring state, check the backend for any errors that may have
         /// occurred during the transfer
         CHECK_DEVICE_STATE = 43,
+        /// Get shared memory regions configuration from the backend.
+        GET_SHMEM_CONFIG = 44,
     }
 }
 
@@ -462,6 +464,8 @@ bitflags! {
         const SHARED_OBJECT = 0x0004_0000;
         /// Support transferring internal device state.
         const DEVICE_STATE = 0x0008_0000;
+        /// Support shared memory regions.
+        const SHMEM = 0x0010_0000;
     }
 }
 
@@ -711,6 +715,34 @@ impl VhostUserSingleMemoryRegion {
 // SAFETY: Safe because all fields of VhostUserSingleMemoryRegion are POD.
 unsafe impl ByteValued for VhostUserSingleMemoryRegion {}
 impl VhostUserMsgValidator for VhostUserSingleMemoryRegion {}
+
+/// Get shared memory regions configuration.
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct VhostUserShMemConfig {
+    /// Total number of shared memory regions
+    nregions: u32,
+    /// Padding for correct alignment
+    padding: u32,
+    /// Size of each memory region
+    memory_sizes: [u64; 8],
+}
+
+impl VhostUserShMemConfig {
+    /// Create a new instance
+    pub fn new(nregions: u32, memory: &[u64]) -> Self {
+        let memory_sizes: [u64; 8] = std::array::from_fn(|i| *memory.get(i).unwrap_or(&0));
+        Self {
+            nregions,
+            padding: 0,
+            memory_sizes,
+        }
+    }
+}
+
+// SAFETY: Safe because all fields of VhostUserSingleMemoryRegion are POD.
+unsafe impl ByteValued for VhostUserShMemConfig {}
+impl VhostUserMsgValidator for VhostUserShMemConfig {}
 
 /// Vring state descriptor.
 #[repr(C, packed)]

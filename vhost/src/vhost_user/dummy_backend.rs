@@ -82,7 +82,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
         } else if self.features_acked {
             return Err(Error::InvalidOperation("features already set"));
         } else if (features & !VIRTIO_FEATURES) != 0 {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("features", features as u64));
         }
 
         self.acked_features = features;
@@ -110,7 +110,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
 
     fn set_vring_num(&mut self, index: u32, num: u32) -> Result<()> {
         if index as usize >= self.queue_num || num == 0 || num as usize > MAX_VRING_NUM {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         self.vring_num[index as usize] = num;
         Ok(())
@@ -126,14 +126,14 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
         _log: u64,
     ) -> Result<()> {
         if index as usize >= self.queue_num {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         Ok(())
     }
 
     fn set_vring_base(&mut self, index: u32, base: u32) -> Result<()> {
         if index as usize >= self.queue_num || base as usize >= MAX_VRING_NUM {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         self.vring_base[index as usize] = base;
         Ok(())
@@ -141,7 +141,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
 
     fn get_vring_base(&mut self, index: u32) -> Result<VhostUserVringState> {
         if index as usize >= self.queue_num {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         // Quotation from vhost-user spec:
         // Client must start ring upon receiving a kick (that is, detecting
@@ -157,7 +157,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
 
     fn set_vring_kick(&mut self, index: u8, fd: Option<File>) -> Result<()> {
         if index as usize >= self.queue_num || index as usize > self.queue_num {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         self.kick_fd[index as usize] = fd;
 
@@ -174,7 +174,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
 
     fn set_vring_call(&mut self, index: u8, fd: Option<File>) -> Result<()> {
         if index as usize >= self.queue_num || index as usize > self.queue_num {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         self.call_fd[index as usize] = fd;
         Ok(())
@@ -182,7 +182,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
 
     fn set_vring_err(&mut self, index: u8, fd: Option<File>) -> Result<()> {
         if index as usize >= self.queue_num || index as usize > self.queue_num {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
         self.err_fd[index as usize] = fd;
         Ok(())
@@ -213,7 +213,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
         self.check_feature(VhostUserVirtioFeatures::PROTOCOL_FEATURES)?;
 
         if index as usize >= self.queue_num || index as usize > self.queue_num {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("index", index as u64));
         }
 
         // Backend must not pass data to/from the backend until ring is
@@ -236,7 +236,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
             || size > VHOST_USER_CONFIG_SIZE - VHOST_USER_CONFIG_OFFSET
             || size + offset > VHOST_USER_CONFIG_SIZE
         {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("get_config", 0));
         }
         assert_eq!(offset, 0x100);
         assert_eq!(size, 4);
@@ -251,7 +251,7 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
             || size > VHOST_USER_CONFIG_SIZE - VHOST_USER_CONFIG_OFFSET
             || size + offset > VHOST_USER_CONFIG_SIZE
         {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("set_config", 0));
         }
         assert_eq!(offset, 0x100);
         assert_eq!(buf.len(), 4);
@@ -308,6 +308,13 @@ impl VhostUserBackendReqHandlerMut for DummyBackendReqHandler {
         Err(Error::ReqHandlerError(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "dummy back end does not support state transfer",
+        )))
+    }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        Err(Error::ReqHandlerError(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "dummy back end does not support shared memory regions",
         )))
     }
 

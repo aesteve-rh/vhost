@@ -205,13 +205,13 @@ impl VhostBackend for Frontend {
     /// addresses. In the ancillary data there is an array of file descriptors
     fn set_mem_table(&self, regions: &[VhostUserMemoryRegionInfo]) -> Result<()> {
         if regions.is_empty() || regions.len() > MAX_ATTACHED_FD_ENTRIES {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("regions", regions.len() as u64));
         }
 
         let mut ctx = VhostUserMemoryContext::new();
         for region in regions.iter() {
             if region.memory_size == 0 || region.mmap_handle < 0 {
-                return error_code(VhostUserError::InvalidParam);
+                return error_code(VhostUserError::InvalidParam("memory_size", region.memory_size));
             }
 
             ctx.append(&region.to_region(), region.mmap_handle);
@@ -267,7 +267,7 @@ impl VhostBackend for Frontend {
     fn set_vring_num(&self, queue_index: usize, num: u16) -> Result<()> {
         let mut node = self.node();
         if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
 
         let val = VhostUserVringState::new(queue_index as u32, num.into());
@@ -281,7 +281,7 @@ impl VhostBackend for Frontend {
         if queue_index as u64 >= node.max_queue_num
             || config_data.flags & !(VhostUserVringAddrFlags::all().bits()) != 0
         {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
 
         let val = VhostUserVringAddr::from_config_data(queue_index as u32, config_data);
@@ -293,7 +293,7 @@ impl VhostBackend for Frontend {
     fn set_vring_base(&self, queue_index: usize, base: u16) -> Result<()> {
         let mut node = self.node();
         if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
 
         let val = VhostUserVringState::new(queue_index as u32, base.into());
@@ -304,7 +304,7 @@ impl VhostBackend for Frontend {
     fn get_vring_base(&self, queue_index: usize) -> Result<u32> {
         let mut node = self.node();
         if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
 
         let req = VhostUserVringState::new(queue_index as u32, 0);
@@ -320,7 +320,7 @@ impl VhostBackend for Frontend {
     fn set_vring_call(&self, queue_index: usize, fd: &EventFd) -> Result<()> {
         let mut node = self.node();
         if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
         let hdr =
             node.send_fd_for_vring(FrontendReq::SET_VRING_CALL, queue_index, fd.as_raw_fd())?;
@@ -334,7 +334,7 @@ impl VhostBackend for Frontend {
     fn set_vring_kick(&self, queue_index: usize, fd: &EventFd) -> Result<()> {
         let mut node = self.node();
         if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
         let hdr =
             node.send_fd_for_vring(FrontendReq::SET_VRING_KICK, queue_index, fd.as_raw_fd())?;
@@ -347,7 +347,7 @@ impl VhostBackend for Frontend {
     fn set_vring_err(&self, queue_index: usize, fd: &EventFd) -> Result<()> {
         let mut node = self.node();
         if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
         let hdr =
             node.send_fd_for_vring(FrontendReq::SET_VRING_ERR, queue_index, fd.as_raw_fd())?;
@@ -403,7 +403,7 @@ impl VhostUserFrontend for Frontend {
                 VhostUserVirtioFeatures::PROTOCOL_FEATURES,
             ));
         } else if queue_index as u64 >= node.max_queue_num {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
 
         let flag = enable.into();
@@ -421,7 +421,7 @@ impl VhostUserFrontend for Frontend {
     ) -> Result<(VhostUserConfig, VhostUserConfigPayload)> {
         let body = VhostUserConfig::new(offset, size, flags);
         if !body.is_valid() {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("is_valid", body.is_valid() as u64));
         }
 
         let mut node = self.node();
@@ -450,11 +450,11 @@ impl VhostUserFrontend for Frontend {
 
     fn set_config(&mut self, offset: u32, flags: VhostUserConfigFlags, buf: &[u8]) -> Result<()> {
         if buf.len() > MAX_MSG_SIZE {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("buf.len()", buf.len() as u64));
         }
         let body = VhostUserConfig::new(offset, buf.len() as u32, flags);
         if !body.is_valid() {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("body.is_valid", body.is_valid() as u64));
         }
 
         let mut node = self.node();
@@ -495,7 +495,7 @@ impl VhostUserFrontend for Frontend {
 
         if inflight.mmap_size == 0 || inflight.num_queues == 0 || inflight.queue_size == 0 || fd < 0
         {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("", 0));
         }
 
         let hdr =
@@ -517,7 +517,7 @@ impl VhostUserFrontend for Frontend {
         let mut node = self.node();
         node.check_proto_feature(VhostUserProtocolFeatures::CONFIGURE_MEM_SLOTS)?;
         if region.memory_size == 0 || region.mmap_handle < 0 {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("", 0));
         }
 
         let body = region.to_single_region();
@@ -530,7 +530,7 @@ impl VhostUserFrontend for Frontend {
         let mut node = self.node();
         node.check_proto_feature(VhostUserProtocolFeatures::CONFIGURE_MEM_SLOTS)?;
         if region.memory_size == 0 {
-            return error_code(VhostUserError::InvalidParam);
+            return error_code(VhostUserError::InvalidParam("", 0));
         }
 
         let body = region.to_single_region();
@@ -638,7 +638,7 @@ impl FrontendInternal {
         fds: Option<&[RawFd]>,
     ) -> VhostUserResult<VhostUserMsgHeader<FrontendReq>> {
         if mem::size_of::<T>() > MAX_MSG_SIZE {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("", 0));
         }
         self.check_state()?;
 
@@ -656,11 +656,11 @@ impl FrontendInternal {
     ) -> VhostUserResult<VhostUserMsgHeader<FrontendReq>> {
         let len = mem::size_of::<T>() + payload.len();
         if len > MAX_MSG_SIZE {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("len", len as u64));
         }
         if let Some(fd_arr) = fds {
             if fd_arr.len() > MAX_ATTACHED_FD_ENTRIES {
-                return Err(VhostUserError::InvalidParam);
+                return Err(VhostUserError::InvalidParam("fd_arr", fd_arr.len() as u64));
             }
         }
         self.check_state()?;
@@ -678,7 +678,7 @@ impl FrontendInternal {
         fd: RawFd,
     ) -> VhostUserResult<VhostUserMsgHeader<FrontendReq>> {
         if queue_index as u64 >= self.max_queue_num {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("queue_index", queue_index as u64));
         }
         self.check_state()?;
 
@@ -696,7 +696,7 @@ impl FrontendInternal {
         hdr: &VhostUserMsgHeader<FrontendReq>,
     ) -> VhostUserResult<T> {
         if mem::size_of::<T>() > MAX_MSG_SIZE || hdr.is_reply() {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("recv_reply", 0));
         }
         self.check_state()?;
 
@@ -712,7 +712,7 @@ impl FrontendInternal {
         hdr: &VhostUserMsgHeader<FrontendReq>,
     ) -> VhostUserResult<(T, Option<Vec<File>>)> {
         if mem::size_of::<T>() > MAX_MSG_SIZE || hdr.is_reply() {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("recv_reply_with_files", 0));
         }
         self.check_state()?;
 
@@ -732,7 +732,7 @@ impl FrontendInternal {
             || hdr.get_size() as usize > MAX_MSG_SIZE
             || hdr.is_reply()
         {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("recv_reply_with_payload", 0));
         }
         self.check_state()?;
 

@@ -77,6 +77,7 @@ pub trait VhostUserBackendReqHandler {
         fd: File,
     ) -> Result<Option<File>>;
     fn check_device_state(&self) -> Result<()>;
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig>;
     #[cfg(feature = "postcopy")]
     fn postcopy_advice(&self) -> Result<File>;
     #[cfg(feature = "postcopy")]
@@ -139,6 +140,7 @@ pub trait VhostUserBackendReqHandlerMut {
         fd: File,
     ) -> Result<Option<File>>;
     fn check_device_state(&mut self) -> Result<()>;
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig>;
     #[cfg(feature = "postcopy")]
     fn postcopy_advice(&mut self) -> Result<File>;
     #[cfg(feature = "postcopy")]
@@ -268,6 +270,10 @@ impl<T: VhostUserBackendReqHandlerMut> VhostUserBackendReqHandler for Mutex<T> {
 
     fn check_device_state(&self) -> Result<()> {
         self.lock().unwrap().check_device_state()
+    }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        self.lock().unwrap().get_shmem_config()
     }
 
     #[cfg(feature = "postcopy")]
@@ -515,7 +521,7 @@ impl<S: VhostUserBackendReqHandler> BackendReqHandler<S> {
                 let enable = match msg.num {
                     1 => true,
                     0 => false,
-                    _ => return Err(Error::InvalidParam),
+                    _ => return Err(Error::InvalidParam("enable", msg.num as u64)),
                 };
 
                 let res = self.backend.set_vring_enable(msg.index, enable);
@@ -563,9 +569,9 @@ impl<S: VhostUserBackendReqHandler> BackendReqHandler<S> {
             }
             Ok(FrontendReq::ADD_MEM_REG) => {
                 self.check_proto_feature(VhostUserProtocolFeatures::CONFIGURE_MEM_SLOTS)?;
-                let mut files = files.ok_or(Error::InvalidParam)?;
+                let mut files = files.ok_or(Error::InvalidParam("files", 0))?;
                 if files.len() != 1 {
-                    return Err(Error::InvalidParam);
+                    return Err(Error::InvalidParam("files.len", files.len() as u64));
                 }
                 let msg =
                     self.extract_request_body::<VhostUserSingleMemoryRegion>(&hdr, size, &buf)?;
@@ -623,6 +629,15 @@ impl<S: VhostUserBackendReqHandler> BackendReqHandler<S> {
                     Ok(_) => VhostUserU64::new(0),
                     Err(_) => VhostUserU64::new(1),
                 };
+                self.send_reply_message(&hdr, &msg)?;
+            }
+            Ok(FrontendReq::GET_SHMEM_CONFIG) => {
+                let res = self.backend.get_shmem_config();
+                let msg = match res {
+                    Ok(mem) => mem,
+                    Err(_) => VhostUserShMemConfig::default(),
+                };
+                println!("Get shmem config: {:?}", msg);
                 self.send_reply_message(&hdr, &msg)?;
             }
             #[cfg(feature = "postcopy")]
@@ -899,7 +914,7 @@ impl<S: VhostUserBackendReqHandler> BackendReqHandler<S> {
             || payload_size > MAX_MSG_SIZE
             || mem::size_of::<T>() + payload_size > MAX_MSG_SIZE
         {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("new_reply_header", 0));
         }
         self.check_state()?;
         Ok(VhostUserMsgHeader::new(

@@ -57,7 +57,7 @@ pub use self::backend_req::Backend;
 #[derive(Debug)]
 pub enum Error {
     /// Invalid parameters.
-    InvalidParam,
+    InvalidParam(&'static str, u64),
     /// Invalid operation due to some reason
     InvalidOperation(&'static str),
     /// Unsupported operation due to missing feature
@@ -101,7 +101,7 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::InvalidParam => write!(f, "invalid parameters"),
+            Error::InvalidParam(name, value) => write!(f, "invalid {} parameters: {}", name, value),
             Error::InvalidOperation(reason) => write!(f, "invalid operation: {}", reason),
             Error::InactiveFeature(bits) => write!(f, "inactive feature: {}", bits.bits()),
             Error::InactiveOperation(bits) => {
@@ -152,7 +152,7 @@ impl Error {
             Error::SocketRetry(_) => false,
             // Looks like the peer deliberately disconnected the socket.
             Error::Disconnected => false,
-            Error::InvalidParam | Error::InvalidOperation(_) => false,
+            Error::InvalidParam(_, _) | Error::InvalidOperation(_) => false,
             Error::InactiveFeature(_) | Error::InactiveOperation(_) => false,
             Error::InvalidMessage | Error::IncorrectFds | Error::OversizedMsg => false,
             Error::SocketError(_) | Error::SocketConnect(_) => false,
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        assert_eq!(format!("{}", Error::InvalidParam), "invalid parameters");
+        assert_eq!(format!("{}", Error::InvalidParam("error", 1)), "invalid error parameters: 1");
         assert_eq!(
             format!("{}", Error::InvalidOperation("reason")),
             "invalid operation: reason"
@@ -516,7 +516,7 @@ mod tests {
         assert!(Error::PartialMessage.should_reconnect());
         assert!(Error::BackendInternalError.should_reconnect());
         assert!(Error::FrontendInternalError.should_reconnect());
-        assert!(!Error::InvalidParam.should_reconnect());
+        assert!(!Error::InvalidParam("param_name", 0).should_reconnect());
         assert!(!Error::InvalidOperation("reason").should_reconnect());
         assert!(
             !Error::InactiveFeature(VhostUserVirtioFeatures::PROTOCOL_FEATURES).should_reconnect()

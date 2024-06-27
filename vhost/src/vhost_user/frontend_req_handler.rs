@@ -443,7 +443,7 @@ impl<S: VhostUserFrontendReqHandler> FrontendReqHandler<S> {
         req: &VhostUserMsgHeader<BackendReq>,
     ) -> Result<VhostUserMsgHeader<BackendReq>> {
         if mem::size_of::<T>() > MAX_MSG_SIZE {
-            return Err(Error::InvalidParam);
+            return Err(Error::InvalidParam("new_reply_header", 0));
         }
         self.check_state()?;
         Ok(VhostUserMsgHeader::new(

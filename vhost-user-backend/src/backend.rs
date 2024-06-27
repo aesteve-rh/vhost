@@ -24,7 +24,7 @@ use std::ops::Deref;
 use std::sync::{Arc, Mutex, RwLock};
 
 use vhost::vhost_user::message::{
-    VhostTransferStateDirection, VhostTransferStatePhase, VhostUserProtocolFeatures,
+    VhostTransferStateDirection, VhostTransferStatePhase, VhostUserProtocolFeatures, VhostUserShMemConfig,
 };
 use vhost::vhost_user::Backend;
 use vm_memory::bitmap::Bitmap;
@@ -144,6 +144,13 @@ pub trait VhostUserBackend: Send + Sync {
             "back end does not support state transfer",
         ))
     }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "back end does not support shared memory regions",
+        ))
+    }
 }
 
 /// Trait without interior mutability for vhost user backend servers to implement concrete services.
@@ -253,6 +260,13 @@ pub trait VhostUserBackendMut: Send + Sync {
             "back end does not support state transfer",
         ))
     }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "back end does not support shared memory regions",
+        ))
+    }
 }
 
 impl<T: VhostUserBackend> VhostUserBackend for Arc<T> {
@@ -329,6 +343,10 @@ impl<T: VhostUserBackend> VhostUserBackend for Arc<T> {
 
     fn check_device_state(&self) -> Result<()> {
         self.deref().check_device_state()
+    }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        self.deref().get_shmem_config()
     }
 }
 
@@ -410,6 +428,10 @@ impl<T: VhostUserBackendMut> VhostUserBackend for Mutex<T> {
     fn check_device_state(&self) -> Result<()> {
         self.lock().unwrap().check_device_state()
     }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        self.lock().unwrap().get_shmem_config()
+    }
 }
 
 impl<T: VhostUserBackendMut> VhostUserBackend for RwLock<T> {
@@ -489,6 +511,10 @@ impl<T: VhostUserBackendMut> VhostUserBackend for RwLock<T> {
 
     fn check_device_state(&self) -> Result<()> {
         self.read().unwrap().check_device_state()
+    }
+
+    fn get_shmem_config(&self) -> Result<VhostUserShMemConfig> {
+        self.read().unwrap().get_shmem_config()
     }
 }
 

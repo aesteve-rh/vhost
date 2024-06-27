@@ -19,7 +19,7 @@ use userfaultfd::{Uffd, UffdBuilder};
 use vhost::vhost_user::message::{
     VhostTransferStateDirection, VhostTransferStatePhase, VhostUserConfigFlags, VhostUserLog,
     VhostUserMemoryRegion, VhostUserProtocolFeatures, VhostUserSingleMemoryRegion,
-    VhostUserVirtioFeatures, VhostUserVringAddrFlags, VhostUserVringState,
+    VhostUserVirtioFeatures, VhostUserVringAddrFlags, VhostUserVringState, VhostUserShMemConfig
 };
 use vhost::vhost_user::{
     Backend, Error as VhostUserError, Result as VhostUserResult, VhostUserBackendReqHandlerMut,
@@ -259,7 +259,7 @@ where
 
     fn set_features(&mut self, features: u64) -> VhostUserResult<()> {
         if (features & !self.backend.features()) != 0 {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("Feature bits", features));
         }
 
         self.acked_features = features;
@@ -339,10 +339,10 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("", 0))?;
 
         if num == 0 || num as usize > self.max_queue_size {
-            return Err(VhostUserError::InvalidParam);
+            return Err(VhostUserError::InvalidParam("num", num as u64));
         }
         vring.set_queue_size(num as u16);
         Ok(())
@@ -360,7 +360,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("", 0))?;
 
         if !self.mappings.is_empty() {
             let desc_table = self.vmm_va_to_gpa(descriptor).map_err(|e| {
@@ -374,7 +374,7 @@ where
             })?;
             vring
                 .set_queue_info(desc_table, avail_ring, used_ring)
-                .map_err(|_| VhostUserError::InvalidParam)?;
+                .map_err(|_| VhostUserError::InvalidParam("", 0))?;
 
             // SET_VRING_BASE will only restore the 'avail' index, however, after the guest driver
             // changes, for instance, after reboot, the 'used' index should be reset to 0.
@@ -393,7 +393,7 @@ where
 
             Ok(())
         } else {
-            Err(VhostUserError::InvalidParam)
+            Err(VhostUserError::InvalidParam("mappings", 0))
         }
     }
 
@@ -401,7 +401,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("", 0))?;
 
         vring.set_queue_next_avail(base as u16);
 
@@ -412,7 +412,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("sdf", 0))?;
 
         // Quote from vhost-user specification:
         // Client must start ring upon receiving a kick (that is, detecting
@@ -446,7 +446,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("set_vring_kick", 0))?;
 
         // SAFETY: EventFd requires that it has sole ownership of its fd. So
         // does File, so this is safe.
@@ -465,7 +465,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("set_vring_call", 0))?;
 
         vring.set_call(file);
 
@@ -480,7 +480,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("set_vring_err", 0))?;
 
         vring.set_err(file);
 
@@ -511,7 +511,7 @@ where
         let vring = self
             .vrings
             .get(index as usize)
-            .ok_or_else(|| VhostUserError::InvalidParam)?;
+            .ok_or_else(|| VhostUserError::InvalidParam("set_vring_enable", 0))?;
 
         // Backend must not pass data to/from the backend until ring is
         // enabled by VHOST_USER_SET_VRING_ENABLE with parameter 1,
@@ -655,6 +655,12 @@ where
     fn check_device_state(&mut self) -> VhostUserResult<()> {
         self.backend
             .check_device_state()
+            .map_err(VhostUserError::ReqHandlerError)
+    }
+
+    fn get_shmem_config(&self) -> VhostUserResult<VhostUserShMemConfig> {
+        self.backend
+            .get_shmem_config()
             .map_err(VhostUserError::ReqHandlerError)
     }
 
